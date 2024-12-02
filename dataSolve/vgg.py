@@ -1,49 +1,27 @@
-import argparse
-
 import torch
-import torchvision
-from torchvision import datasets, transforms
-from torch import nn
+import torch.nn as nn
+import torchvision.models as models
+import torchvision.transforms as transforms
 from PIL import Image
-import matplotlib.pyplot as plt
+class MultiTaskModel(nn.Module):
+    def __init__(self, num_classes1, num_classes2, flag):
+        super(MultiTaskModel, self).__init__()
+        self.resnet = models.resnet50(pretrained=True)
 
+        # Freeze the weights of the convolutional layers
+        for param in self.resnet.parameters():
+            param.requires_grad = flag
 
-def apply_test_transforms(inp):
-    out = transforms.functional.resize(inp, [224, 224])
-    out = transforms.functional.to_tensor(out)
-    out = transforms.functional.normalize(out, [0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
-    return out
+        # Add new fully connected layers
+        self.fc1 = nn.Linear(1000, num_classes1)
+        self.fc2 = nn.Linear(1000, num_classes2)
 
+    def forward(self, x):
+        x = self.resnet(x)
+        x1 = self.fc1(x)
+        x2 = self.fc2(x)
 
-def predict(model, filepath, classes, show_img=False):
-    # 读取本地文件
-    im = Image.open(filepath)
-
-    if show_img:
-        plt.imshow(im)
-        plt.show()  # 显示图片
-
-    # 图像预处理
-    im_as_tensor = apply_test_transforms(im)
-    minibatch = torch.stack([im_as_tensor])
-
-    # 如果有GPU可用，将数据移到GPU
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    minibatch = minibatch.to(device)
-
-    # 将模型移到相同的设备（CPU 或 GPU）
-    model = model.to(device)
-
-    # 进行模型预测
-    pred = model(minibatch)
-
-    # 获取预测结果
-    _, classnum = torch.max(pred, 1)
-    # print("Predicted Class Index:", classnum.item())
-
-    # 返回预测的类名
-    return classes[classnum.item()]
-
+        return x1, x2
 
 def get_classes():
     classes = [
@@ -90,52 +68,55 @@ def get_classes():
     ]
     return classes
 
+def preprocess_image(image_path):
+    # 定义图像的转换操作
+    transform = transforms.Compose([
+        transforms.Resize(256),  # 调整图像大小
+        transforms.CenterCrop(224),  # 中心裁剪为224x224
+        transforms.ToTensor(),  # 转为Tensor
+        transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])  # 正规化
+    ])
+
+    # 打开图片
+    img = Image.open(image_path).convert('RGB')
+
+    # 应用转换
+    img = transform(img)
+
+    img = img.unsqueeze(0)
+
+    return img
 
 
-def main(img_path):
-    # 直接写死路径，删除命令行参数
-    # dataset_path = "C:/Users/杨大宇/Desktop/学科资料/数字图像处理/大作业/CUB_200_2011/images/"
-    model_path = "C:/Users/杨大宇/Desktop/学科资料/数字图像处理/大作业/Bird identification/model/EfficientNet.pth"
+def predict(image_path):
+    CLASS_DIM = 200
+    CONCEPT_DIM = 312
+    flag = False
+    model = MultiTaskModel(CLASS_DIM, CONCEPT_DIM, flag)
 
-    show_img = False  # 是否显示图像
+    model.load_state_dict(torch.load(model_path = "C:/Users/杨大宇/Desktop/学科资料/数字图像处理/大作业/Bird identification/model/vgg.pth"))
 
-    # 获取数据集的类别
-    classes = get_classes()
-    # print(classes)
-
-    # 加载模型
-    model = torchvision.models.efficientnet_b0(pretrained=True)
-
-    # 冻结所有模型参数
-    for param in model.parameters():
-        param.requires_grad = False
-
-    # 替换模型的最后一层
-    n_inputs = model.classifier[1].in_features
-    model.classifier = nn.Sequential(
-        nn.Linear(n_inputs, 2048),
-        nn.SiLU(),
-        nn.Dropout(0.3),
-        nn.Linear(2048, len(classes))
-    )
-
-    # 加载保存的模型权重
-    model.load_state_dict(torch.load(model_path))
     model.eval()
 
+    # 从本地读取一张图片
+    # image_path = '1.jpg'  # 替换为你的图片路径
+    img_tensor = preprocess_image(image_path)
+
+    # 将图片转移到适当的设备 (GPU 或 CPU)
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    model.to(device)
+    img_tensor = img_tensor.to(device)
+
     # 进行预测
-    result = predict(model, img_path, classes, show_img=show_img)  # 使用传入的图像路径
-    return result.split(".")[1]
-    # print("Predicted Class Name:", result)
+    with torch.no_grad():  # 不需要计算梯度，进行推断时会节省内存
+        output1, output2 = model(img_tensor)
 
-def add(a,b):
-    return a + b
+    # 获取输出的类别索引
+    _, predicted_class = torch.max(output1, 1)
 
-if __name__ == "__main__":
-    # 解析命令行参数
-    parser = argparse.ArgumentParser()
-    parser.add_argument("img_path", help="Path to the image for prediction")
-    args = parser.parse_args()
+    classes = get_classes()
 
-    # 调用主函数，传入图片路径
-    main(args.img_path)
+    # 显示预测的类别名称
+    predicted_class_name = classes[predicted_class.item()]
+
+    return predicted_class_name.split(".")[1]
