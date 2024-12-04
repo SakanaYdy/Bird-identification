@@ -624,13 +624,7 @@ function new_image = edge_laplacian(~, f, T)
 
 ![img](https://pic.leetcode.cn/1733273461-LTfhLN-image.png)
 
-<center class="half">
-<img src="https://pic.leetcode.cn/1733273516-LzPlDc-image.png" width=300/>
-<img src="https://pic.leetcode.cn/1733273529-eDeaUD-image.png" width=300/>
-<img src="https://pic.leetcode.cn/1733273561-ICriFb-image.png" width=300/>
-</center>
-
-
+![img](https://pic.leetcode.cn/1733275248-agRCSN-image.png)
 
 ### 总结
 
