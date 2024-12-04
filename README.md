@@ -864,9 +864,11 @@ function [histogram, lbp_image] = lbp_histogram(app,image, radius, neighbors)
         end
 ```
 
-### TODO 缺少对提取出来的目标的特征提取 
 
 
+![img](https://pic.leetcode.cn/1733276433-HjBZZt-image.png)
+
+![img](https://pic.leetcode.cn/1733276487-MWwiba-image.png)
 
 ## 深度学习分类模型
 
